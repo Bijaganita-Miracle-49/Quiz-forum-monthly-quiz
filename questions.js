@@ -17,7 +17,7 @@
    the page source. The server re-checks every score, so nobody can fake a score,
    but nothing here can stop someone from reading answers. See README "Limitations".
    ============================================================ */
-window.QF_QUESTIONS = [
+var QF_QUESTIONS = [
   {
     id: "q01", topic: "Technology & Infrastructure",
     statement: "Kavach is India's indigenous Automatic Train Protection system designed to improve railway safety.",
@@ -139,6 +139,9 @@ window.QF_QUESTIONS = [
     status: "Stable fact. Link not opened during this session."
   }
 ];
+
+if (typeof window !== "undefined") window.QF_QUESTIONS = QF_QUESTIONS;
+if (typeof module !== "undefined") module.exports = QF_QUESTIONS;
 
 /* ------------------------------------------------------------
    ADMIN NOTE — every answer above is TRUE, so a student who taps TRUE
