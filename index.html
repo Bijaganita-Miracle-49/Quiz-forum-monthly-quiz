@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quiz Forum — True or False?</title>
+  <meta name="description" content="Quiz Forum monthly general knowledge and current affairs quiz.">
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to quiz</a>
+  <canvas id="confetti" aria-hidden="true"></canvas>
+
+  <main id="main">
+
+    <!-- A. WELCOME -->
+    <section id="screen-welcome" class="screen" aria-labelledby="welcome-title">
+      <div class="card hero">
+        <div class="stickers" aria-hidden="true">
+          <span class="sticker s1">🧠</span><span class="sticker s2">⚡</span><span class="sticker s3">🔥</span>
+        </div>
+        <div class="mascot" aria-hidden="true">
+          <svg viewBox="0 0 120 120" width="120" height="120">
+            <ellipse cx="60" cy="112" rx="30" ry="5" fill="#14213d" opacity=".15"/>
+            <path d="M30 26 L60 12 L90 26 L60 40 Z" fill="#14213d"/>
+            <rect x="52" y="38" width="16" height="8" fill="#14213d"/>
+            <line x1="90" y1="26" x2="94" y2="46" stroke="#ffc933" stroke-width="3"/>
+            <circle cx="94" cy="48" r="4" fill="#ffc933"/>
+            <circle cx="60" cy="72" r="38" fill="#ffc933" stroke="#14213d" stroke-width="4"/>
+            <circle cx="46" cy="66" r="12" fill="#fff" stroke="#14213d" stroke-width="4"/>
+            <circle cx="74" cy="66" r="12" fill="#fff" stroke="#14213d" stroke-width="4"/>
+            <line x1="58" y1="66" x2="62" y2="66" stroke="#14213d" stroke-width="4"/>
+            <circle cx="48" cy="67" r="4.5" fill="#14213d"/>
+            <circle cx="72" cy="67" r="4.5" fill="#14213d"/>
+            <path d="M46 88 Q60 100 74 88" fill="none" stroke="#14213d" stroke-width="4" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <p class="edition-badge" id="edition-badge"></p>
+        <h1 id="welcome-title"></h1>
+        <p class="subtitle" id="welcome-subtitle"></p>
+        <p class="tagline" id="welcome-tagline"></p>
+
+        <div id="pending-banner" class="notice warn" hidden>
+          <p><strong>You have a finished quiz that was not saved yet.</strong></p>
+          <button type="button" class="btn secondary" id="btn-resume">Open my result and retry saving</button>
+          <button type="button" class="btn link" id="btn-discard">Discard it</button>
+        </div>
+
+        <form id="start-form" novalidate>
+          <label for="name-input">Your full name <span class="req">(required)</span></label>
+          <input id="name-input" name="name" type="text" autocomplete="name" inputmode="text"
+                 maxlength="60" aria-describedby="name-help name-error" placeholder="e.g. Priya Sharma">
+          <p id="name-help" class="help">Use English letters. This exact spelling will be printed on your certificate.</p>
+          <p id="name-error" class="error" role="alert" hidden></p>
+          <button type="submit" class="btn primary big" id="btn-start">Start Quiz 🚀</button>
+        </form>
+
+        <div class="rules">
+          <h2>How it works</h2>
+          <ul id="rules-list"></ul>
+        </div>
+
+        <p class="demo-flag" id="demo-flag" hidden>⚠️ Demo mode: results are <strong>not</strong> being recorded anywhere.</p>
+
+        <p class="privacy"><strong>Privacy:</strong> your name, score and completion record are stored for
+          Quiz Forum administration and for issuing your certificate. Nothing else about you is collected.
+          Names and scores are never shown publicly.</p>
+      </div>
+    </section>
+
+    <!-- B. QUIZ -->
+    <section id="screen-quiz" class="screen" hidden aria-labelledby="q-statement">
+      <div class="card quiz">
+        <div class="topbar">
+          <p class="progress-text" id="progress-text" aria-live="polite"></p>
+          <p class="score-pill" id="score-pill" aria-label="Current score"></p>
+          <p class="timer" id="timer" role="timer" aria-label="Seconds remaining"><span id="timer-num">10</span><small>s</small></p>
+        </div>
+        <div class="bar" aria-hidden="true"><div class="bar-fill" id="progress-fill"></div></div>
+        <div class="bar timer-bar" aria-hidden="true"><div class="bar-fill" id="timer-fill"></div></div>
+
+        <div id="tab-warning" class="notice warn" role="status" hidden>
+          👀 You switched away from this tab. The timer keeps running. (This is a friendly reminder, not a lock.)
+        </div>
+
+        <p class="topic" id="q-topic"></p>
+        <h2 id="q-statement" tabindex="-1"></h2>
+
+        <div class="answers" id="answers">
+          <button type="button" class="btn answer true" id="btn-true"  data-value="TRUE"><span aria-hidden="true">✅</span> TRUE</button>
+          <button type="button" class="btn answer false" id="btn-false" data-value="FALSE"><span aria-hidden="true">❌</span> FALSE</button>
+        </div>
+        <p class="kbd-hint" aria-hidden="true">Tip: press <kbd>T</kbd> for True or <kbd>F</kbd> for False</p>
+
+        <p class="reaction" id="reaction" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <!-- C. RESULTS -->
+    <section id="screen-results" class="screen" hidden aria-labelledby="result-title">
+      <div class="card results">
+        <p class="big-emoji" id="result-emoji" aria-hidden="true"></p>
+        <h2 id="result-title"></h2>
+        <p class="blurb" id="result-blurb"></p>
+        <p class="final-score"><span id="result-score"></span><small> / <span id="result-total"></span></small></p>
+
+        <dl class="stats">
+          <div><dt>Percentage</dt><dd id="stat-pct"></dd></div>
+          <div class="ok"><dt>Correct</dt><dd id="stat-correct"></dd></div>
+          <div class="bad"><dt>Incorrect</dt><dd id="stat-incorrect"></dd></div>
+          <div class="late"><dt>Timed out</dt><dd id="stat-timeout"></dd></div>
+        </dl>
+
+        <div id="save-panel" class="notice" role="status" aria-live="polite">
+          <p id="save-message"></p>
+          <button type="button" class="btn secondary" id="btn-retry" hidden>Retry saving</button>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn primary big" id="btn-cert" disabled>🎓 Generate My Certificate</button>
+          <p class="help" id="cert-policy"></p>
+        </div>
+
+        <h3>Answers &amp; explanations</h3>
+        <ol class="review" id="review"></ol>
+      </div>
+    </section>
+
+    <!-- D. CERTIFICATE -->
+    <section id="screen-cert" class="screen" hidden aria-labelledby="cert-heading">
+      <div class="card certcard">
+        <h2 id="cert-heading">Your certificate is ready 🎉</h2>
+        <div class="cert-preview" id="cert-preview">
+          <p class="cp-org" id="cp-org"></p>
+          <p class="cp-title" id="cp-title"></p>
+          <p class="cp-name" id="cp-name"></p>
+          <p class="cp-line" id="cp-line"></p>
+          <p class="cp-meta" id="cp-meta"></p>
+        </div>
+        <div class="actions row">
+          <button type="button" class="btn primary big" id="btn-download">⬇️ Download Certificate PDF</button>
+          <button type="button" class="btn secondary big" id="btn-print">🖨️ Print Certificate</button>
+        </div>
+        <p class="error" id="cert-error" role="alert" hidden></p>
+        <p class="help">This is a Quiz Forum participation certificate. It is not an accredited qualification.</p>
+        <button type="button" class="btn link" id="btn-back-results">← Back to my results</button>
+      </div>
+    </section>
+
+  </main>
+
+  <footer><p id="footer-text"></p></footer>
+
+  <script src="vendor/jspdf.umd.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/questions.js"></script>
+  <script src="js/confetti.js"></script>
+  <script src="js/certificate.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
