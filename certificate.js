@@ -73,16 +73,16 @@
 
     doc.setDrawColor.apply(doc, NAVY); doc.setLineWidth(0.4);
     doc.line(30, 175, 90, 175);       // date line
-    doc.line(207, 175, 267, 175);     // signature line
+    //doc.line(207, 175, 267, 175);     // signature line
     centered2(doc, dateStr, 60, 171, 12, "helvetica", "bold", NAVY);
     centered2(doc, "Date of completion", 60, 180, 9, "helvetica", "normal", GREY);
-    centered2(doc, data.coordinatorTitle || "Quiz Forum Coordinator", 237, 180, 9, "helvetica", "normal", GREY);
-    centered2(doc, "Signature", 237, 185, 8, "helvetica", "italic", GREY);
+    //centered2(doc, data.coordinatorTitle || "Quiz Forum Coordinator", 237, 180, 9, "helvetica", "normal", GREY);
+    //centered2(doc, "Signature", 237, 185, 8, "helvetica", "italic", GREY);
 
     centered2(doc, "Certificate ID", 148.5, 166, 9, "helvetica", "normal", GREY);
     centered2(doc, String(data.certId), 148.5, 173, 13, "courier", "bold", NAVY);
 
-    centered(doc, "This is a Quiz Forum participation certificate. It is not an accredited qualification.", 192, 8, "helvetica", "italic", GREY);
+    centered(doc, "This is a Quiz Forum participation certificate.", 192, 8, "helvetica", "italic", GREY);
 
     if (data.demo) {
       doc.setTextColor(200, 40, 40); doc.setFont("helvetica", "bold"); doc.setFontSize(10);
