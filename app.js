@@ -386,6 +386,11 @@
       msg.textContent = (st.server && st.server.duplicate)
         ? "✅ Your result was already recorded earlier. No duplicate was created."
         : "✅ Your result has been saved by the server.";
+      if (st.server && st.server.sheetSync === "pending") {
+        msg.textContent += st.server.sheetSyncEnabled === false
+          ? " Your result is safely stored; Google Sheets syncing is not enabled for this deployment."
+          : " Your result is safely stored; the Google Sheets copy is pending.";
+      }
       if (st.server && st.mismatch) {
         msg.textContent += " Note: the server recalculated your score as " + st.server.score + " / " + st.server.maxScore + ". The certificate uses the server's figure.";
       }
@@ -426,8 +431,7 @@
 
     fetch(C.scriptUrl, {
       method: "POST",
-      // text/plain avoids a CORS preflight, which Apps Script cannot answer.
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
       redirect: "follow",
       signal: controller ? controller.signal : undefined
@@ -466,7 +470,10 @@
       invalid_answers: "The server could not validate the answers. Please tell the organiser.",
       invalid_attempt: "The attempt ID was rejected.",
       already_participated: "This name has already been recorded for this edition.",
-      busy: "The server is busy. Please retry in a few seconds."
+      busy: "The server is busy. Please retry in a few seconds.",
+      storage_unavailable: "Secure result storage is temporarily unavailable. Please retry shortly.",
+      invalid_request: "The submission could not be read. Please reload the page and retry.",
+      forbidden: "This submission must come from the quiz website."
     };
     return map[code] || ("The server rejected the submission" + (code ? " (" + code + ")." : "."));
   }

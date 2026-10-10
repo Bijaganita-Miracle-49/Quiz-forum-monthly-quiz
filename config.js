@@ -1,13 +1,13 @@
 /* ============================================================
    QUIZ FORUM — ADMIN CONFIGURATION  (edit this file monthly)
-   Questions live in js/questions.js. Nothing else needs editing.
+   Questions live in questions.js.
    ============================================================ */
-window.QF_CONFIG = {
+var QF_CONFIG = {
   // ---- Titles shown on screen and on the certificate ----
   quizTitle: "Quiz Forum — True or False?",
   subtitle: "Monthly General Knowledge & Current Affairs Quiz",
-  editionLabel: "September 2026",        // must match EDITION in apps-script/Code.gs
-  editionCode: "202609",                 // used in certificate IDs; must match Code.gs
+  editionLabel: "September 2026",
+  editionCode: "202609",
   organizerName: "Quiz Forum",
   certificateTitle: "Certificate of Participation",
   coordinatorTitle: "Quiz Forum Coordinator",
@@ -29,10 +29,7 @@ window.QF_CONFIG = {
     { min: 0,  title: "Meme Enjoyer, Fact Learner", emoji: "🐸", blurb: "Plot twist: you now know more than before. Read on!" }
   ],
 
-  // ---- Google Sheets backend ----
-  // Paste your Apps Script Web App URL (ends with /exec) between the quotes.
-  // Leave it EMPTY to run in DEMO MODE: nothing is saved and certificates are stamped "DEMO".
-  scriptUrl: "https://script.google.com/macros/s/AKfycbwlmSWrncPt_U6j8mo88pWmQxRmnGR_yPOaNXAHabqsv8MIIOGhTO23eEj6XTl2mS6xSQ/exec",
+  scriptUrl: "/api/results",
   saveTimeoutMs: 20000,
   // true  = the certificate unlocks only after the server confirms the result is saved.
   // false = participants may generate a certificate even if saving failed (not recommended).
@@ -41,3 +38,6 @@ window.QF_CONFIG = {
   // ---- Name rules ----
   nameMaxLength: 60
 };
+
+if (typeof window !== "undefined") window.QF_CONFIG = QF_CONFIG;
+if (typeof module !== "undefined") module.exports = QF_CONFIG;

@@ -1,118 +1,84 @@
 # Quiz Forum — True or False?
 
-A free, static quiz website (HTML + CSS + vanilla JS) with a Google Apps Script backend that writes results to **your** Google Sheet, plus a downloadable PDF participation certificate.
+A monthly quiz with a static HTML/CSS/JavaScript frontend, server-validated results, and PDF participation certificates. A Netlify Function saves each completed attempt in Netlify Database and copies its result to the organiser's Google Sheet using a Google service account. No Google credentials are sent to the browser.
 
-```
-quiz-forum/
-├── index.html              the website
-├── css/styles.css          design (cream / navy / yellow, green TRUE, red FALSE)
-├── js/config.js            ← EDIT MONTHLY: title, timer, randomisation, scriptUrl …
-├── js/questions.js         ← EDIT MONTHLY: the 15 statements, answers, explanations, sources
-├── js/app.js               quiz engine, timer, scoring, results, saving, certificate screen
-├── js/certificate.js       PDF certificate (jsPDF)
-├── js/confetti.js          lightweight confetti
-├── vendor/jspdf.umd.min.js PDF library, bundled so hosting needs nothing else
-├── apps-script/Code.gs     ← paste into Google Apps Script
-├── admin-key.html          ADMIN ONLY: generates the answer-key block for Code.gs (don't host it)
-└── tests/                  automated tests (optional): npm install && npm test
-```
+## Google Sheets setup (required before live sync)
 
----
+The default destination is the supplied spreadsheet:
+https://docs.google.com/spreadsheets/d/1mqdgd8f86I0JzTsjC0Ht17qnTbZ873hyvVh9xH8GvXU/edit
 
-## 1. Run it locally (30 seconds)
+1. In Google Cloud Console, create or select a project and enable the **Google Sheets API**.
+2. Create a **service account** for this integration and obtain its JSON key through Google's service-account key settings. If your organisation disables key creation, ask its administrator for an approved setup rather than changing that policy.
+3. Open the spreadsheet's **Share** dialog and grant the service account's email **Editor** access. A public sharing link alone does not permit API writes. Keep participant results private; the sheet does not need to be public.
+4. In Netlify **Project configuration → Environment variables**, add the following with **Functions** scope for the production context:
 
-Any static server works. With Python installed:
+| Variable | What to configure |
+| --- | --- |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | The service-account JSON's `client_email` field |
+| `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | The JSON's `private_key` field, kept only in Netlify's secure environment-variable settings |
+| `GOOGLE_SHEETS_SPREADSHEET_ID` | Optional override; the supplied spreadsheet ID is already the backend default |
+| `GOOGLE_SHEETS_TAB` | Optional override; defaults to `Netlify Quiz Results` |
 
-```
-cd quiz-forum
-python3 -m http.server 8080
-```
-Open http://localhost:8080. (Double-clicking `index.html` also mostly works, but a server is safer.)
+The private key supports both actual newlines and literal escaped \n sequences. Never paste a key into chat, commit the JSON key, put it in `config.js`, or share it in screenshots. Rotate a key through Google Cloud if it is exposed.
 
-Out of the box `scriptUrl` is empty, so the site runs in **DEMO MODE**: it says so on the welcome screen, nothing is saved, and certificates are stamped "DEMO COPY".
+5. Publish a new Netlify deployment after setting the variables. Netlify installs the dependencies and applies the generated database migration during deployment. No Apps Script deployment or separate application server is required.
+6. Complete a quiz on the published site. The backend creates a dedicated **Netlify Quiz Results** tab and writes its header and result. Existing tabs are not modified.
 
-## 2. Free hosting (pick one)
+The tab is managed by this site's database. Do not delete its headers, reorder its physical rows, or use the same tab for another site or database. Use filter views or a separate reporting tab for sorting and analysis. Every result uses a stable row based on its database ID, so retries update that row rather than appending duplicates. The backend refuses to overwrite a row belonging to a different attempt or a tab with unexpected headers.
 
-| Option | Steps |
-|---|---|
-| **Netlify Drop** (easiest) | Delete `admin-key.html`, `tests/`, `node_modules/`. Go to app.netlify.com/drop, drag the folder in. You get a public link. |
-| **GitHub Pages** | New public repo → upload the files (not `admin-key.html`) → Settings → Pages → Deploy from branch `main` / root. Link: `https://<you>.github.io/<repo>/`. |
-| **Cloudflare Pages** | Pages → Create project → Direct Upload → upload the folder. |
+Google's service-account authorization reference:
+https://developers.google.com/identity/protocols/oauth2/service-account
 
-Because the site is static, the page itself (including `questions.js`) is public. That is expected; see *Limitations*.
+## Saving, retries, and certificates
 
-## 3. Create the Google Sheet
+- The browser submits the participant's name, edition, question order, answers, and attempt ID to `POST /api/results`. The backend validates the submission and calculates the score from the same question bank used by the frontend; a submitted score is not trusted.
+- The attempt is saved to Netlify Database **before** Google Sheets is contacted. This is the authoritative result, so a Sheets outage does not lose completed attempts.
+- Repeating an identical attempt ID returns the original record and certificate ID. Reusing that ID with different answers or participant details is rejected. Separate attempts by the same name are allowed.
+- The page distinguishes **saved securely, Google Sheets copy pending** from a submission that failed to reach database storage. A certificate unlocks after the authoritative result is stored, even if its Sheets copy is pending.
+- Google writes are attempted immediately. Pending copies are retried by a scheduled Netlify Function every five minutes, up to ten eligible attempts per invocation. Leases prevent concurrent workers from processing the same attempt. Failed attempts retain a safe diagnostic code in the database and remain queued.
+- If database storage or the browser's submission fails, the page offers **Retry saving**. The existing browser recovery feature retains an unsent attempt on that device when local storage is available; it is not an official stored result.
+- There is no public endpoint to list names or results. The Google key and OAuth access tokens remain server-side. Google values are written as literal values, not formulas.
 
-1. Sign in to the Google account that should own the data → https://sheets.google.com → **Blank spreadsheet**. Name it `Quiz Forum Results`.
-2. Leave it empty. The script creates a tab named **Participants** with these columns:
+## Deployment previews and local development
 
-| A | B | C | D | E | F | G | H | I | J | K |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Timestamp | Participant Name | Quiz Edition | Score | Total Questions | Percentage | Correct Answers | Incorrect Answers | Timed-out Questions | Certificate ID | Completion Status |
+Google Sheets writes are disabled outside production by default so preview database IDs cannot overwrite production rows. Scheduled retries run only on published production deployments.
 
-## 4. Add the server code
+For an explicit integration test in a deploy preview or Netlify Dev, set `GOOGLE_SHEETS_SYNC_PREVIEWS=true` and provide Google credentials in that context. **Also select a separate test spreadsheet or dedicated test tab** using `GOOGLE_SHEETS_SPREADSHEET_ID` or `GOOGLE_SHEETS_TAB`. A preview's pending copies need a manual invocation of the scheduled function through Netlify's tooling or an identical submission retry; production scheduling does not run in previews.
 
-1. In the sheet: **Extensions → Apps Script**.
-2. Delete the placeholder code, paste the whole of `apps-script/Code.gs`, click **Save** (💾). Name the project `Quiz Forum`.
-3. Pick the function **`setup`** in the toolbar dropdown → **Run**. Click **Review permissions → choose your account → Advanced → Go to Quiz Forum (unsafe) → Allow**. (Google shows this warning for every personal script; you wrote it, so it is safe to allow.) The `Participants` tab and header row now exist.
+Install dependencies with `npm install` and start Netlify Dev on port 8889:
 
-## 5. Deploy as a Web App (exact steps)
+`netlify dev --port 8889`
 
-1. Apps Script editor → **Deploy → New deployment**.
-2. Click the ⚙️ next to "Select type" → **Web app**.
-3. Description: `Quiz Forum v1`. **Execute as: Me (your email).** **Who has access: Anyone.**
-4. **Deploy** → copy the **Web app URL** (ends in `/exec`).
-5. Open `js/config.js`, paste it into `scriptUrl: "…"`, save, re-upload/redeploy the website.
-6. Test the link: open the `/exec` URL in a browser. You should see `{"ok":true,"service":"Quiz Forum",…}`.
+A simple static server can display the quiz but cannot serve the result-saving endpoint. Demo mode is available by clearing `scriptUrl` in `config.js`; demo results are not recorded and certificates are marked as demo copies.
 
-**Changing `Code.gs` later:** Deploy → **Manage deployments** → ✏️ edit → Version: **New version** → Deploy. The URL stays the same. (Saving the file alone does *not* update the live web app.)
+## Project layout and monthly updates
 
-### Access settings and security trade-offs
-- *Anyone* is required: students are not signed in, so any narrower setting would show them a Google login. Everyone who has the URL can **submit**; nobody can **read** the sheet through it (`doGet` returns only a health check).
-- The URL is visible in the page source, so a determined person could send fake submissions. Mitigations built in: server-side scoring from the answer key, strict validation, edition check, duplicate protection, and a lock against simultaneous writes. It cannot stop someone from submitting a valid perfect attempt by reading `questions.js` (see Limitations).
-- Keep the Google Sheet itself **private** (don't share it). Only you see names and scores.
-- No passwords, API keys or service accounts exist anywhere in the frontend.
+- `index.html`, `styles.css`, `app.js`: quiz screens and interaction.
+- `config.js`, `questions.js`: monthly settings and question bank, shared by the browser and backend.
+- `certificate.js`, `jspdf.umd.min.js`, `confetti.js`: certificates and completion effects.
+- `db/schema.ts`, `db/index.ts`: authoritative result storage and the database client.
+- `server/quiz.ts`, `server/sheets.ts`, `server/sync.ts`: validation, Google authorization, and retryable writes.
+- `netlify/functions/results.mts`, `netlify/functions/sync-sheets.mts`: submission API and scheduled retries.
+- `netlify/database/migrations/`: generated migrations applied by Netlify.
 
-## 6. Monthly routine
-1. Edit `js/questions.js` (statements, `"TRUE"`/`"FALSE"`, explanations, sources) and `js/config.js` (`editionLabel`, `editionCode`).
-2. Open `admin-key.html` on your computer → read the warnings → **Copy** → paste over `SETTINGS` + `ANSWER_KEY` in `Code.gs` → Deploy a **new version**.
-3. Re-upload the site. (To keep old data tidy, make a new Google Sheet per month or just filter by *Quiz Edition*.)
+For each edition, update `editionLabel`, `editionCode`, quiz settings in `config.js`, and the statements, answers, explanations, and sources in `questions.js`, then deploy them together. No separate answer-key update is needed. Previously stored attempts retain their original scores and certificates.
 
-## 7. Administrator workflow (viewing / exporting results)
-Open the sheet → sort or filter the columns → **File → Download → CSV** (or Excel). Use *Data → Create a filter* to filter by edition. Duplicates cannot appear for the same attempt; a student who deliberately retakes the quiz creates a *new* row (set `ALLOW_MULTIPLE_ATTEMPTS_PER_NAME: false` in `Code.gs` to allow one per name per edition).
+For schema changes, update `db/schema.ts` and generate a migration with `npm run db:generate -- --name describe_change`. Do not manually apply migration SQL. Run `npm run typecheck` to validate server types without building.
 
-## 8. How saving and certificates behave
-- A row is written **only** after a quiz is finished. Opening the site or abandoning the quiz writes nothing.
-- The browser sends the answers (not a score). The server re-scores them, builds the certificate ID, appends the row and replies. The page says "saved" **only** after that reply.
-- Each attempt has a random attempt ID; the certificate ID is derived from it, so resending the same attempt returns the existing record instead of adding a row.
-- If saving fails (offline, timeout, server error): results stay visible, a red notice says the result is **not** saved, a **Retry saving** button appears, and the finished answers are kept in the browser's local storage so even a page refresh offers to recover them.
-- **Certificate policy:** the certificate unlocks only after the server confirms the save, so the name and score on the PDF always match the official record. (`requireSaveBeforeCertificate: false` in `config.js` relaxes this; such certificates are then stamped as unrecorded.)
-- The PDF uses real text (jsPDF), shrinks long names to fit, and states it is a participation certificate, not an accredited qualification. The Print button opens the PDF in a new tab with the print dialog.
-- Names are limited to **English letters, spaces, `.` `'` `-`** because the PDF's built-in fonts can't draw other scripts (Tamil, Hindi etc.). The form explains this.
+## Verification and troubleshooting
 
-## 9. Test checklist (manual, ~10 minutes)
-Items marked ✅ were also run automatically (`npm install && npm test`).
+After configuring Google credentials and publishing:
 
-| # | Check | How |
-|---|---|---|
-| 1 | Correct answer ✅ | Tap TRUE on Q1 → green reaction, score 1 |
-| 2 | Incorrect answer ✅ | Tap FALSE on Q2 → red reaction, score unchanged |
-| 3 | 10-second timeout ✅ | Do nothing for 10 s → "Time's up", next question appears by itself |
-| 4 | Last-question transition ✅ | Answer Q15 → results appear, no Q16 |
-| 5 | Duplicate click prevention ✅ | Tap both buttons rapidly → only the first counts |
-| 6 | Empty name ✅ | Press Start with nothing / spaces → error, quiz does not start |
-| 7 | Long names ✅ | 55-character name → one line inside the border on the PDF |
-| 8 | Sheets save success | Set `scriptUrl`, finish a quiz → green "saved", one new row |
-| 9 | Network failure + retry ✅ (simulated) | Finish a quiz with Wi-Fi off → red "NOT saved" + Retry; reconnect → Retry → saved, still one row |
-| 10 | Certificate PDF ✅ | Results → Generate → Download; open the PDF, check name/score/ID |
-| 11 | Mobile layout | Open on a phone: buttons stack comfortably, explanations readable, timer visible |
-| 12 | Tab switching | Switch tabs during a question → yellow reminder; timer keeps running |
-| 13 | Refresh recovery | Finish offline, refresh → "unsaved result" banner → Resume |
+1. Finish a quiz and verify the server confirms storage, the sheet gets one result, and the PDF uses the official score and certificate ID.
+2. Retry the identical submission: neither the database nor the sheet should gain another attempt.
+3. Temporarily revoke sheet access for a controlled test. New results should remain stored with Sheets pending. Restore access and confirm the scheduled job fills the same rows.
+4. Test offline completion and browser recovery; reconnect and retry.
+5. Check mobile layout, answer timeouts, tab-switch reminders, and certificate downloads.
 
-## 10. Limitations (honest list)
-- **Answers are readable in the page source.** The site is static and shows instant feedback, so the answer key must be in the browser. The server prevents *forged scores*, but it can't stop a student from reading `questions.js`. This is deliberate "reasonable friction" for a casual quiz. If you later need real secrecy, the server would have to deliver one question at a time and judge each answer.
-- **All 15 supplied answers are TRUE**, so tapping TRUE every time scores 15/15. `questions.js` ends with suggested FALSE variants.
-- Tab-switch detection is only a reminder; it does not prevent looking things up.
-- Instant "correct/incorrect" feedback after each question (requested) tells students that question's answer immediately.
-- One person can start another attempt; only duplicate *submissions of the same attempt* are blocked (optionally: repeated names).
-- The Apps Script daily quotas for free Google accounts are far above 50 participants.
+If the page says the **Sheets copy is pending**, check the production Function environment-variable scopes, Sheets API activation, spreadsheet sharing with the service account, and the destination tab. Function logs contain only safe error codes, never raw Google responses, private keys, tokens, or participant details. Common codes include `sheets_auth_failed`, `sheets_permission_denied`, `sheets_not_found`, `sheets_header_mismatch`, `sheets_row_conflict`, and `sheets_timeout`.
+
+If the page says **the result has NOT been saved**, the database request itself failed. Confirm that the Netlify Function and database migration deployed successfully, then retry the stored browser attempt. Static-only hosting no longer provides result saving.
+
+## Limitations
+
+This is a casual quiz, not a secure examination system. The answer key is public for immediate feedback, the countdown and tab-switch reminder are enforced in the browser, and participants can start another attempt. The server validates submitted answers and calculates scores but cannot prevent reading the answer key or enforce a real-world identity. PDF fonts limit participant names to supported Latin characters. Google API quotas or access failures can delay the Sheets copy without losing the authoritative result.
